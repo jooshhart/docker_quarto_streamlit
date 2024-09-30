@@ -1,0 +1,15 @@
+pandas
+polars
+lets-plot
+pyarrow
+plotly
+streamlit
+quickjs
+pygwalker
+great_tables
+papermill
+nbformat
+quarto
+duckdb
+jupyter
+streamlit-pdf-viewer
