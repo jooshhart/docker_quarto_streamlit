@@ -12,4 +12,5 @@ nbformat
 quarto
 duckdb
 jupyter
+plotnine
 streamlit-pdf-viewer

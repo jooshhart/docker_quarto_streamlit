@@ -1,0 +1,161 @@
+---
+title: "Church Phones"
+format:
+  html:
+    embed-resources: true
+---
+
+# Questions
+
+### 1. What differences are there between iPhone and Android users when comparing visits to The Church of Jesus Christ buildings of Latter-day Saints in Utah and Georgia?
+
+### 2. Compare hourly usage patterns between The Church of Jesus Christ of Latter-day Saints and the other churches in each state.
+
+### 3. Contrast the related_same_day_brand brands between those who visit the Church of Jesus Christ of Latter-day Saints and those who visit other churches.
+
+# Set-Up
+```{python}
+import polars as pl
+import pandas as pd
+from lets_plot  import *
+import plotly.express as px
+import numpy as np
+import altair as alt
+import pyarrow as pa
+LetsPlot.setup_html()
+```
+
+```{python}
+patterns = pl.read_parquet("../data/parquet/patterns.parquet")
+places = pl.read_parquet("../data/parquet/places.parquet")
+combo = patterns.join(places, on="placekey", how="full")
+```
+
+```{python}
+patterns.head(5)
+```
+
+```{python}
+places.head(5)
+```
+
+# Question 1: Iphone or Android
+```{python}
+selection1 = combo.select(['region', 'device_type', 'location_name'])
+place = selection1.filter((pl.col('region') == 'UT') | (pl.col('region') == 'GA'))
+church = place.filter(location_name = "The Church of Jesus Christ of Latter day Saints")
+
+church = church.filter(
+    pl.col("region").is_not_null() & pl.col("device_type").is_not_null() & pl.col("location_name").is_not_null()
+)
+```
+
+```{python}
+place.head(5).glimpse()
+church.head(5)
+```
+
+```{python}
+phone = church.explode("device_type").unnest("device_type")
+
+agg_data = phone.group_by(pl.col("region"),pl.col("key")).agg(pl.sum("value"))
+```
+
+```{python}
+agg_data.head(5)
+```
+
+```{python}
+gg = ggplot(agg_data, aes(x='region', y='value', fill='key')) + \
+    geom_bar(stat='identity', position='dodge') + \
+    ggtitle('Comparison of Android and iOS Visits to LDS Buildings in Utah and Georgia') + \
+    xlab('Region') + \
+    ylab('Total Visits') + \
+    scale_fill_manual(values=["#FF9999", "#9999FF"], name="Device Type")
+
+gg.show()
+```
+
+### This is interesting, because for some reason, Android and IOS Are around the same value and very low in Georgia, but very high in Utah with Android being even higher than IOS.
+
+# Question 2: How popular is the church?
+```{python}
+selection2 = combo.select(['region', 'location_name', 'popularity_by_hour']).filter(pl.col("region").is_not_null() & pl.col("popularity_by_hour").is_not_null() & pl.col("location_name").is_not_null())
+
+churches = selection2.with_columns(
+    pl.when(pl.col('location_name') == 'The Church of Jesus Christ of Latter day Saints')
+    .then(pl.lit('The Church of Jesus Christ of Latter day Saints'))
+    .otherwise(pl.lit('Other Church'))
+    .alias('churches')
+)
+
+hour = churches.with_columns(
+   index = pl.int_ranges(pl.col("popularity_by_hour").list.len())
+).explode("popularity_by_hour", "index").with_columns(
+    hours = pl.col('index').add(1)
+).select(['region', 'churches', 'popularity_by_hour', 'hours'])
+
+church_total = hour.group_by(pl.col("hours"), pl.col("region"), pl.col("churches")).agg(pl.sum("popularity_by_hour"))
+```
+
+```{python}
+church_total.head(5)
+```
+
+```{python}
+gg2 = (ggplot(church_total, aes(x='hours', y='popularity_by_hour')) + \
+       geom_point(aes(color='churches'), position='dodge', size=3) + \
+       ggtitle('Comparison of Church of Jesus Christ and Other Church Visits in Utah and Georgia') + \
+       facet_wrap('region') + \
+       xlab('Hours') + \
+       ylab('Total Visits') + \
+       scale_color_manual(values=["#FF9999", "#9999FF"], name="Churches"))
+
+gg2.show()
+```
+
+```{python}
+counts = churches.to_series(3)
+counts.value_counts()
+```
+
+### After looking at this information, we can see that the Church of Jesus Christ isn't as popular in Georgia compared to in Utah, which really doesn't come as a surprise. However, there is the need to know that this graph shows visits per buiding where there are about 13 times as many different churches in Other Church as there are buildings in The Church of Jesus Christ.
+
+# Question 3: Same Day Brands
+```{python}
+selection3 = combo.select(['related_same_day_brand', 'location_name']).filter(pl.col("related_same_day_brand").is_not_null() & pl.col("location_name").is_not_null())
+
+churches2 = selection3.with_columns(
+    pl.when(pl.col('location_name') == 'The Church of Jesus Christ of Latter day Saints')
+    .then(pl.lit('Church of Jesus Christ'))
+    .otherwise(pl.lit('Other Church'))
+    .alias('churches')
+).select(['related_same_day_brand', 'churches'])
+
+brand = churches2.explode('related_same_day_brand').unnest('related_same_day_brand').group_by(pl.col('churches'), pl.col('key')).agg(pl.sum('value'))
+```
+
+```{python}
+brand.head(5)
+```
+
+```{python}
+gg3 = (ggplot(brand, aes(x='key', y='value')) + \
+       geom_point(position='dodge') + \
+       facet_wrap('churches', scales='free_y') + \
+       ggtitle('Same Day Visits between churches and brands') + \
+       xlab('Brand') + \
+       ylab('Same_Day_Visits') + \
+        theme(axis_text_x=element_text(size=8))
+)
+
+gg3.show()
+```
+
+```{python}
+counts = churches2.to_series(1)
+counts.value_counts()
+```
+
+### It looks like to me that those who visit other churches visit other brands more often. However, this data is a bit negligent since there is probably more of the other churches than there is of just the Church of Jesus Christ. The averages we see are 10,000 and 300,000. Other church is 13 times as large in the number of building compared to Chruch of Jesus Christ, but has 30 times as many visits to different brands.
+

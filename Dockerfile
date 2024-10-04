@@ -20,9 +20,9 @@ RUN set -e -x && \
 ARG QUARTO_VERSION="1.5.56"
 ARG QUARTO_VERSION
 RUN set -e -x && \
-  curl -o quarto-${QUARTO_VERSION}-linux-arm64.deb -L https://github.com/quarto-dev/quarto-cli/releases/download/v${QUARTO_VERSION}/quarto-${QUARTO_VERSION}-linux-arm64.deb \
-  && gdebi --non-interactive quarto-${QUARTO_VERSION}-linux-arm64.deb \
-  && rm -f quarto-${QUARTO_VERSION}-linux-arm64.deb    
+  curl -o quarto-${QUARTO_VERSION}-linux-amd64.deb -L https://github.com/quarto-dev/quarto-cli/releases/download/v${QUARTO_VERSION}/quarto-${QUARTO_VERSION}-linux-amd64.deb \
+  && gdebi --non-interactive quarto-${QUARTO_VERSION}-linux-amd64.deb \
+  && rm -f quarto-${QUARTO_VERSION}-linux-amd64.deb    
 
 
 ADD $QUICKJS_TAR .
